@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Трекер учебных задач</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --card: #ffffff;
+    --text: #1d2330;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --accent: #4f46e5;
+    --accent-soft: #eef2ff;
+    --ok: #16a34a;
+    --ok-soft: #dcfce7;
+    --danger: #dc2626;
+    --danger-soft: #fee2e2;
+    --radius: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115;
+      --card: #181b22;
+      --text: #e7e9ee;
+      --muted: #9aa1ad;
+      --line: #2a2f3a;
+      --accent: #818cf8;
+      --accent-soft: #23264a;
+      --ok: #4ade80;
+      --ok-soft: #153222;
+      --danger: #f87171;
+      --danger-soft: #3a1a1a;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.4;
+  }
+
+  .app { max-width: 640px; margin: 32px auto 96px; padding: 0 16px; }
+
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  h1 { font-size: 1.5rem; margin: 0; }
+
+  .link-btn {
+    background: none; border: none; padding: 0;
+    color: var(--muted); font: inherit; font-size: .85rem;
+    text-decoration: underline; cursor: pointer;
+  }
+  .link-btn:hover { color: var(--accent); }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  /* Сводка */
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .stat-label { font-size: .8rem; color: var(--muted); }
+  .stat-value { font-size: 1.5rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .progress {
+    height: 10px; margin-top: 14px;
+    background: var(--line); border-radius: 999px; overflow: hidden;
+  }
+  .progress-bar { height: 100%; width: 0; background: var(--ok); border-radius: 999px; transition: width .3s ease; }
+  .progress-note { margin-top: 8px; font-size: .85rem; color: var(--muted); }
+
+  /* Форма */
+  form { display: flex; flex-wrap: wrap; gap: 8px; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field-title { flex: 1 1 220px; }
+  .field-hours { width: 120px; }
+  .field label { font-size: .8rem; color: var(--muted); }
+  input[type="text"], input[type="number"] {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font: inherit;
+    background: var(--card);
+    color: var(--text);
+  }
+  input.invalid { border-color: var(--danger); }
+  .form-actions { display: flex; align-items: flex-end; }
+  button { font: inherit; cursor: pointer; }
+  .btn-primary {
+    padding: 10px 18px;
+    border: none; border-radius: 8px;
+    background: var(--accent); color: #fff; font-weight: 600;
+  }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .form-error { min-height: 1.2em; margin-top: 6px; font-size: .85rem; color: var(--danger); }
+
+  input:focus-visible, button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* Фильтры */
+  .filters {
+    display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 12px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  }
+  .filter {
+    padding: 6px 12px;
+    border: none; border-radius: 7px;
+    background: transparent; color: var(--muted);
+  }
+  .filter:hover { color: var(--text); }
+  .filter.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .count { opacity: .75; font-variant-numeric: tabular-nums; }
+
+  /* Список */
+  .task-list { list-style: none; margin: 0; padding: 0; }
+  .task {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 4px;
+    border-bottom: 1px solid var(--line);
+  }
+  .task:last-child { border-bottom: none; }
+  .task-check {
+    display: flex; align-items: center; gap: 12px;
+    flex: 1; min-width: 0; cursor: pointer;
+  }
+  .task-check input {
+    width: 20px; height: 20px; flex-shrink: 0;
+    accent-color: var(--ok); cursor: pointer;
+  }
+  .task-title { overflow-wrap: anywhere; }
+  .task.done .task-title { text-decoration: line-through; color: var(--muted); }
+  .hours {
+    flex-shrink: 0;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent);
+    font-size: .85rem; font-weight: 600; font-variant-numeric: tabular-nums;
+  }
+  .task.done .hours { background: var(--ok-soft); color: var(--ok); }
+  .delete {
+    flex-shrink: 0;
+    width: 32px; height: 32px;
+    border: none; border-radius: 8px;
+    background: transparent; color: var(--muted);
+    font-size: 1.3rem; line-height: 1;
+  }
+  .delete:hover { background: var(--danger-soft); color: var(--danger); }
+  .empty { padding: 20px 4px; text-align: center; color: var(--muted); }
+
+  /* Уведомление с отменой */
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 16px;
+    max-width: calc(100% - 32px);
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: #1d2330; color: #fff;
+    box-shadow: 0 8px 24px rgba(0,0,0,.2);
+  }
+  .toast button {
+    border: none; background: none; padding: 0;
+    color: #a5b4fc; font-weight: 600; white-space: nowrap;
+  }
+
+  @media (max-width: 480px) {
+    .app { margin-top: 16px; }
+    .stat-value { font-size: 1.2rem; }
+    .field-hours { flex: 1 1 100px; }
+    .form-actions { flex: 1 1 100%; }
+    .btn-primary { width: 100%; }
+    .filters { display: flex; }
+    .filter { flex: 1; }
+  }
+</style>
+</head>
+<body>
+<main class="app">
+  <header>
+    <h1>Учебные задачи</h1>
+    <button type="button" class="link-btn" id="resetBtn">Вернуть пример</button>
+  </header>
+
+  <section class="card" aria-label="Сводка">
+    <div class="stats">
+      <div>
+        <div class="stat-label">Всего часов</div>
+        <div class="stat-value" id="totalHours">0 ч</div>
+      </div>
+      <div>
+        <div class="stat-label">Выполнено</div>
+        <div class="stat-value" id="doneHours">0 ч</div>
+      </div>
+      <div>
+        <div class="stat-label">Прогресс</div>
+        <div class="stat-value" id="percent">0%</div>
+      </div>
+    </div>
+    <div class="progress" id="progress" role="progressbar"
+         aria-label="Процент выполнения по часам" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <div class="progress-note" id="progressNote"></div>
+  </section>
+
+  <section class="card" aria-label="Новая задача">
+    <form id="addForm" novalidate>
+      <div class="field field-title">
+        <label for="titleInput">Название задачи</label>
+        <input type="text" id="titleInput" maxlength="120" placeholder="Например, «Конспект лекции»" autocomplete="off">
+      </div>
+      <div class="field field-hours">
+        <label for="hoursInput">Оценка, ч</label>
+        <input type="number" id="hoursInput" min="0.5" step="0.5" placeholder="2" inputmode="decimal">
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn-primary">Добавить</button>
+      </div>
+    </form>
+    <div class="form-error" id="formError" role="alert"></div>
+  </section>
+
+  <div class="filters" role="group" aria-label="Фильтр задач">
+    <button type="button" class="filter" data-filter="all">Все <span class="count"></span></button>
+    <button type="button" class="filter" data-filter="active">Активные <span class="count"></span></button>
+    <button type="button" class="filter" data-filter="done">Готовые <span class="count"></span></button>
+  </div>
+
+  <section class="card" aria-label="Список задач">
+    <ul class="task-list" id="taskList"></ul>
+    <div class="empty" id="emptyState" hidden></div>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" hidden>
+  <span id="toastText"></span>
+  <button type="button" id="undoBtn">Отменить</button>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  const STORAGE_KEY = 'study-tasks-tracker-v1';
+  const EXAMPLE = [
+    { title: 'Чтение',     hours: 2, done: true  },
+    { title: 'Практика',   hours: 4, done: false },
+    { title: 'Повторение', hours: 2, done: false }
+  ];
+  const EMPTY_TEXT = {
+    all: 'Задач пока нет — добавьте первую выше.',
+    active: 'Активных задач нет. Отличная работа!',
+    done: 'Готовых задач пока нет.'
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    form: $('addForm'),
+    title: $('titleInput'),
+    hours: $('hoursInput'),
+    error: $('formError'),
+    list: $('taskList'),
+    empty: $('emptyState'),
+    filters: document.querySelectorAll('.filter'),
+    total: $('totalHours'),
+    doneHours: $('doneHours'),
+    percent: $('percent'),
+    progress: $('progress'),
+    bar: $('progressBar'),
+    note: $('progressNote'),
+    toast: $('toast'),
+    toastText: $('toastText'),
+    undo: $('undoBtn'),
+    reset: $('resetBtn')
+  };
+
+  let tasks = loadTasks();
+  let currentFilter = 'all';
+  let lastDeleted = null;
+  let toastTimer = null;
+
+  // ---------- Данные ----------
+  function uid() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  function withIds(list) {
+    return list.map((t) => ({ id: uid(), title: t.title, hours: t.hours, done: t.done }));
+  }
+
+  function isValidTask(t) {
+    return t && typeof t.title === 'string' && typeof t.hours === 'number'
+      && Number.isFinite(t.hours) && t.hours > 0;
+  }
+
+  function loadTasks() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (Array.isArray(data)) {
+          return data.filter(isValidTask).map((t) => ({
+            id: String(t.id || uid()), title: t.title, hours: t.hours, done: Boolean(t.done)
+          }));
+        }
+      }
+    } catch (e) { /* хранилище недоступно — начинаем с примера */ }
+    return withIds(EXAMPLE);
+  }
+
+  function saveTasks() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); } catch (e) { /* без сохранения */ }
+  }
+
+  const sumHours = (list) => list.reduce((s, t) => s + t.hours, 0);
+  const fmt = (n) => n.toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+
+  function matchesFilter(task, filter) {
+    if (filter === 'active') return !task.done;
+    if (filter === 'done') return task.done;
+    return true;
+  }
+
+  // ---------- Отрисовка ----------
+  function renderItem(task) {
+    const li = document.createElement('li');
+    li.className = 'task' + (task.done ? ' done' : '');
+
+    const label = document.createElement('label');
+    label.className = 'task-check';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = task.done;
+    checkbox.dataset.id = task.id;
+
+    const title = document.createElement('span');
+    title.className = 'task-title';
+    title.textContent = task.title;
+
+    label.append(checkbox, title);
+
+    const hours = document.createElement('span');
+    hours.className = 'hours';
+    hours.textContent = fmt(task.hours) + ' ч';
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'delete';
+    del.dataset.id = task.id;
+    del.title = 'Удалить';
+    del.setAttribute('aria-label', 'Удалить задачу «' + task.title + '»');
+    del.textContent = '×';
+
+    li.append(label, hours, del);
+    return li;
+  }
+
+  function render() {
+    // Сводка всегда считается по всем задачам, независимо от фильтра
+    const doneList = tasks.filter((t) => t.done);
+    const total = sumHours(tasks);
+    const done = sumHours(doneList);
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+    els.total.textContent = fmt(total) + ' ч';
+    els.doneHours.textContent = fmt(done) + ' ч';
+    els.percent.textContent = pct + '%';
+    els.bar.style.width = pct + '%';
+    els.progress.setAttribute('aria-valuenow', String(pct));
+    els.note.textContent = tasks.length
+      ? 'Готово задач: ' + doneList.length + ' из ' + tasks.length + ' · осталось ' + fmt(total - done) + ' ч'
+      : 'Добавьте первую задачу, чтобы увидеть прогресс';
+
+    const counts = { all: tasks.length, active: tasks.length - doneList.length, done: doneList.length };
+    els.filters.forEach((btn) => {
+      const f = btn.dataset.filter;
+      const isActive = f === currentFilter;
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-pressed', String(isActive));
+      btn.querySelector('.count').textContent = counts[f];
+    });
+
+    const visible = tasks.filter((t) => matchesFilter(t, currentFilter));
+    els.list.replaceChildren(...visible.map(renderItem));
+    els.empty.hidden = visible.length > 0;
+    els.empty.textContent = EMPTY_TEXT[currentFilter];
+  }
+
+  // ---------- Форма ----------
+  function showError(message, input) {
+    els.error.textContent = message;
+    els.title.classList.toggle('invalid', input === els.title);
+    els.hours.classList.toggle('invalid', input === els.hours);
+    if (input) input.focus();
+  }
+
+  function clearError() {
+    els.error.textContent = '';
+    els.title.classList.remove('invalid');
+    els.hours.classList.remove('invalid');
+  }
+
+  els.form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const title = els.title.value.trim();
+    const hours = parseFloat(String(els.hours.value).replace(',', '.'));
+
+    if (!title) return showError('Введите название задачи.', els.title);
+    if (!Number.isFinite(hours) || hours <= 0) return showError('Укажите оценку больше 0 часов.', els.hours);
+    if (hours > 1000) return showError('Слишком большая оценка — не больше 1000 ч.', els.hours);
+
+    tasks.push({ id: uid(), title: title, hours: Math.round(hours * 100) / 100, done: false });
+    saveTasks();
+
+    // Чтобы новая задача сразу была видна
+    if (currentFilter === 'done') currentFilter = 'all';
+
+    els.form.reset();
+    clearError();
+    render();
+    els.title.focus();
+  });
+
+  els.title.addEventListener('input', clearError);
+  els.hours.addEventListener('input', clearError);
+
+  // ---------- Отметка «готово» и удаление ----------
+  els.list.addEventListener('change', (e) => {
+    const box = e.target;
+    if (!box.matches('input[type="checkbox"]')) return;
+    const task = tasks.find((t) => t.id === box.dataset.id);
+    if (!task) return;
+    task.done = box.checked;
+    saveTasks();
+    render();
+  });
+
+  els.list.addEventListener('click', (e) => {
+    const btn = e.target.closest('.delete');
+    if (!btn) return;
+    const index = tasks.findIndex((t) => t.id === btn.dataset.id);
+    if (index < 0) return;
+    const removed = tasks.splice(index, 1)[0];
+    lastDeleted = { task: removed, index: index };
+    saveTasks();
+    render();
+    showToast('Задача «' + removed.title + '» удалена');
+  });
+
+  // ---------- Уведомление с отменой ----------
+  function showToast(text) {
+    els.toastText.textContent = text;
+    els.toast.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, 5000);
+  }
+
+  function hideToast() {
+    els.toast.hidden = true;
+    lastDeleted = null;
+  }
+
+  els.undo.addEventListener('click', () => {
+    if (!lastDeleted) return;
+    const pos = Math.min(lastDeleted.index, tasks.length);
+    tasks.splice(pos, 0, lastDeleted.task);
+    saveTasks();
+    clearTimeout(toastTimer);
+    hideToast();
+    render();
+  });
+
+  // ---------- Фильтры ----------
+  els.filters.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      currentFilter = btn.dataset.filter;
+      render();
+    });
+  });
+
+  // ---------- Вернуть пример ----------
+  els.reset.addEventListener('click', () => {
+    if (!confirm('Заменить текущий список задач примером?')) return;
+    tasks = withIds(EXAMPLE);
+    currentFilter = 'all';
+    saveTasks();
+    clearError();
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
